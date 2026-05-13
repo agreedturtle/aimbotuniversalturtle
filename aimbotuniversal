@@ -1,0 +1,128 @@
+-- =============================================
+-- UNIVERSAL AIMBOT (Works in most Roblox games)
+-- =============================================
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ==================== SETTINGS ====================
+local AimBotEnabled = true
+local AimKey = Enum.UserInputType.MouseButton2   -- Right Click (Hold)
+local Smoothness = 0.25                          -- 0.1 = very fast | 0.6 = smooth
+local FOV = 120                                  -- Field of View
+local VisibilityCheck = true
+local TargetPart = "Head"                        -- Head, HumanoidRootPart, UpperTorso
+
+local TeamCheck = false                          -- Set to true in team games
+
+-- FOV Circle
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 2
+fovCircle.NumSides = 80
+fovCircle.Radius = FOV
+fovCircle.Filled = false
+fovCircle.Transparency = 0.6
+fovCircle.Color = Color3.fromRGB(255, 50, 50)
+fovCircle.Visible = true
+
+-- ==================== MAIN FUNCTIONS ====================
+local function isVisible(targetCharacter)
+    if not VisibilityCheck then return true end
+    
+    local target = targetCharacter:FindFirstChild(TargetPart) or targetCharacter:FindFirstChild("HumanoidRootPart")
+    if not target then return false end
+    
+    local origin = Camera.CFrame.Position
+    local direction = (target.Position - origin).Unit * 1000
+    
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction, params)
+    return result and result.Instance and result.Instance:IsDescendantOf(targetCharacter)
+end
+
+local function getClosestPlayer()
+    local closest = nil
+    local minDist = FOV
+    
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local part = player.Character:FindFirstChild(TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
+            
+            if humanoid and humanoid.Health > 0 and part then
+                
+                -- Team Check
+                if TeamCheck and player.Team == LocalPlayer.Team then continue end
+                
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    
+                    if distance < minDist and isVisible(player.Character) then
+                        minDist = distance
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ==================== AIMBOT LOOP ====================
+RunService.RenderStepped:Connect(function()
+    fovCircle.Position = UserInputService:GetMouseLocation()
+    fovCircle.Radius = FOV
+    
+    if not AimBotEnabled then return end
+    
+    local targetPlayer = getClosestPlayer()
+    
+    if targetPlayer and targetPlayer.Character then
+        local target = targetPlayer.Character:FindFirstChild(TargetPart) or 
+                      targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if target then
+            local targetPos = Camera:WorldToViewportPoint(target.Position)
+            local mousePos = UserInputService:GetMouseLocation()
+            
+            local dx = (targetPos.X - mousePos.X) * Smoothness
+            local dy = (targetPos.Y - mousePos.Y) * Smoothness
+            
+            mousemoverel(dx, dy)
+        end
+    end
+end)
+
+-- ==================== TOGGLES ====================
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == AimKey then
+        AimBotEnabled = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == AimKey then
+        AimBotEnabled = false
+    end
+end)
+
+-- Toggle FOV Circle with INSERT
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        fovCircle.Visible = not fovCircle.Visible
+    end
+end)
+
+print("✅ Universal Aimbot Loaded!")
+print("Hold Right Click to Aim | Press INSERT to toggle FOV circle")
