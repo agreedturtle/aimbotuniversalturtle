@@ -1,5 +1,6 @@
 -- =============================================
--- UNIVERSAL ROBLOX AIMBOT + EXTRAS
+-- UNIVERSAL ROBLOX AIMBOT + COMBAT MENU
+-- Press P to open menu
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -10,112 +11,131 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== SETTINGS ====================
-local AimBot = {
+local Aimbot = {
     Enabled = false,
-    Smoothness = 0.25,
-    FOV = 150,
+    Smoothness = 0.22,
+    FOV = 180,
     TargetPart = "Head",
     TeamCheck = false,
     VisibilityCheck = true,
-    HoldMode = true,          -- Hold Right Click or Toggle
+    HoldToAim = true,
 }
 
 local Combat = {
     RapidFire = false,
     NoReload = false,
+    NoRecoil = false,
+    Triggerbot = false,
+    InfiniteAmmo = false,
 }
 
--- FOV Circle
+local Visuals = {
+    ShowFOV = true,
+    ESP_Enabled = false,
+}
+
+-- ==================== KAVO UI LIBRARY ====================
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Universal Aimbot", "Ocean")
+
+-- ==================== TABS ====================
+local AimbotTab = Window:NewTab("Aimbot")
+local CombatTab = Window:NewTab("Combat")
+local VisualsTab = Window:NewTab("Visuals")
+local SettingsTab = Window:NewTab("Settings")
+
+-- ==================== AIMBOT TAB ====================
+AimbotTab:NewToggle("Enable Aimbot", false, function(state)
+    Aimbot.Enabled = state
+end)
+
+AimbotTab:NewToggle("Hold to Aim (Right Click)", true, function(state)
+    Aimbot.HoldToAim = state
+end)
+
+AimbotTab:NewSlider("Smoothness", 0.05, 1, 0.22, function(value)
+    Aimbot.Smoothness = value
+end)
+
+AimbotTab:NewSlider("FOV", 50, 600, 180, function(value)
+    Aimbot.FOV = value
+end)
+
+AimbotTab:NewDropdown("Target Part", {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"}, function(currentOption)
+    Aimbot.TargetPart = currentOption
+end)
+
+AimbotTab:NewToggle("Team Check", false, function(state)
+    Aimbot.TeamCheck = state
+end)
+
+AimbotTab:NewToggle("Visibility Check", true, function(state)
+    Aimbot.VisibilityCheck = state
+end)
+
+-- ==================== COMBAT TAB ====================
+CombatTab:NewToggle("Rapid Fire", false, function(state)
+    Combat.RapidFire = state
+end)
+
+CombatTab:NewToggle("No Reload / Infinite Ammo", false, function(state)
+    Combat.NoReload = state
+end)
+
+CombatTab:NewToggle("No Recoil", false, function(state)
+    Combat.NoRecoil = state
+end)
+
+CombatTab:NewToggle("Triggerbot", false, function(state)
+    Combat.Triggerbot = state
+end)
+
+-- ==================== VISUALS TAB ====================
+VisualsTab:NewToggle("Show FOV Circle", true, function(state)
+    Visuals.ShowFOV = state
+end)
+
+VisualsTab:NewToggle("Basic ESP (Boxes)", false, function(state)
+    Visuals.ESP_Enabled = state
+end)
+
+-- ==================== FOV CIRCLE ====================
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 2
-fovCircle.NumSides = 64
-fovCircle.Radius = AimBot.FOV
+fovCircle.NumSides = 80
+fovCircle.Radius = Aimbot.FOV
 fovCircle.Filled = false
-fovCircle.Transparency = 0.7
-fovCircle.Color = Color3.fromRGB(255, 50, 50)
+fovCircle.Transparency = 0.75
+fovCircle.Color = Color3.fromRGB(255, 0, 100)
 fovCircle.Visible = true
 
--- ==================== GUI MENU ====================
-local lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/UI-Libs/main/Vape.txt"))()
-local win = lib:Window("Universal Aimbot", Color3.fromRGB(0, 170, 255), Enum.KeyCode.P)
-
-local aimTab = win:Tab("Aimbot")
-local combatTab = win:Tab("Combat")
-
--- Aimbot Settings
-aimTab:Toggle("Enable Aimbot", false, function(s)
-    AimBot.Enabled = s
-end)
-
-aimTab:Toggle("Hold Mode (Right Click)", true, function(s)
-    AimBot.HoldMode = s
-end)
-
-aimTab:Slider("Smoothness", 0.05, 1, 0.25, function(v)
-    AimBot.Smoothness = v
-end)
-
-aimTab:Slider("FOV", 50, 500, 150, function(v)
-    AimBot.FOV = v
-    fovCircle.Radius = v
-end)
-
-aimTab:Dropdown("Target Part", {"Head", "UpperTorso", "HumanoidRootPart"}, function(selected)
-    AimBot.TargetPart = selected
-end)
-
-aimTab:Toggle("Team Check", false, function(s)
-    AimBot.TeamCheck = s
-end)
-
-aimTab:Toggle("Visibility Check", true, function(s)
-    AimBot.VisibilityCheck = s
-end)
-
-aimTab:Toggle("Show FOV Circle", true, function(s)
-    fovCircle.Visible = s
-end)
-
--- Combat Features
-combatTab:Toggle("Rapid Fire", false, function(s)
-    Combat.RapidFire = s
-end)
-
-combatTab:Toggle("No Reload / Infinite Ammo", false, function(s)
-    Combat.NoReload = s
-end)
-
-combatTab:Label("More coming soon...")
-
-print("✅ Universal Aimbot + Menu Loaded! | Press P")
-
--- ==================== AIMBOT FUNCTIONS ====================
+-- ==================== MAIN FUNCTIONS ====================
 local function isVisible(targetChar)
-    if not AimBot.VisibilityCheck then return true end
-    local target = targetChar:FindFirstChild(AimBot.TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
+    if not Aimbot.VisibilityCheck then return true end
+    local target = targetChar:FindFirstChild(Aimbot.TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
     if not target then return false end
 
     local origin = Camera.CFrame.Position
-    local direction = (target.Position - origin).Unit * 2000
+    local direction = (target.Position - origin).Unit * 3000
 
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
 
-    local result = workspace:Raycast(origin, direction, raycastParams)
-    return result and result.Instance and result.Instance:IsDescendantOf(targetChar)
+    local result = workspace:Raycast(origin, direction, params)
+    return result and result.Instance:IsDescendantOf(targetChar)
 end
 
 local function getClosestPlayer()
-    local closest, minDist = nil, AimBot.FOV
+    local closest, minDist = nil, Aimbot.FOV + 1
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local hum = player.Character:FindFirstChild("Humanoid")
-            local part = player.Character:FindFirstChild(AimBot.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
+            local part = player.Character:FindFirstChild(Aimbot.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
 
             if hum and hum.Health > 0 and part then
-                if AimBot.TeamCheck and player.Team == LocalPlayer.Team then continue end
+                if Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
 
                 local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
@@ -133,26 +153,23 @@ local function getClosestPlayer()
     return closest
 end
 
--- ==================== MAIN AIMBOT LOOP ====================
-local aiming = false
-
+-- ==================== AIMBOT LOOP ====================
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = UserInputService:GetMouseLocation()
+    fovCircle.Radius = Aimbot.FOV
+    fovCircle.Visible = Visuals.ShowFOV
 
-    if not AimBot.Enabled then return end
+    if not Aimbot.Enabled then return end
 
-    local targetPlayer = getClosestPlayer()
-
-    if targetPlayer and targetPlayer.Character then
-        local targetPart = targetPlayer.Character:FindFirstChild(AimBot.TargetPart) or 
-                          targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-        if targetPart then
-            local targetPos = Camera:WorldToViewportPoint(targetPart.Position)
+    local target = getClosestPlayer()
+    if target and target.Character then
+        local part = target.Character:FindFirstChild(Aimbot.TargetPart) or target.Character:FindFirstChild("HumanoidRootPart")
+        if part then
+            local targetPos = Camera:WorldToViewportPoint(part.Position)
             local mousePos = UserInputService:GetMouseLocation()
 
-            local dx = (targetPos.X - mousePos.X) * AimBot.Smoothness
-            local dy = (targetPos.Y - mousePos.Y) * AimBot.Smoothness
+            local dx = (targetPos.X - mousePos.X) * Aimbot.Smoothness
+            local dy = (targetPos.Y - mousePos.Y) * Aimbot.Smoothness
 
             mousemoverel(dx, dy)
         end
@@ -162,36 +179,27 @@ end)
 -- ==================== KEYBINDS ====================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then  -- Right Click
-        if AimBot.HoldMode then
-            AimBot.Enabled = true
-        end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
+        Aimbot.Enabled = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and AimBot.HoldMode then
-        AimBot.Enabled = false
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
+        Aimbot.Enabled = false
     end
 end)
 
--- ==================== RAPID FIRE & NO RELOAD ====================
+-- ==================== COMBAT FEATURES ====================
 RunService.Heartbeat:Connect(function()
-    if Combat.RapidFire or Combat.NoReload then
-        pcall(function()
-            local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if tool then
-                local script = tool:FindFirstChildOfClass("LocalScript") or tool:FindFirstChildOfClass("Script")
-                if script then
-                    -- Simple rapid fire attempt
-                    if Combat.RapidFire then
-                        tool:Activate()
-                    end
-                end
-            end
-        end)
+    if not LocalPlayer.Character then return end
+    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if not tool then return end
+
+    if Combat.RapidFire then
+        tool:Activate()
     end
 end)
 
-print("Hold Right Click to Aim | Press P for Menu")
+print("✅ Universal Aimbot Loaded Successfully!")
+print("Press P to open the menu")
