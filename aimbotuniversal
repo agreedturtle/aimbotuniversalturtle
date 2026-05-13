@@ -1,6 +1,5 @@
 -- =============================================
--- UNIVERSAL ROBLOX AIMBOT + COMBAT MENU
--- Press P to open menu
+-- LIGHT UNIVERSAL AIMBOT (More Stable)
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -11,112 +10,31 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== SETTINGS ====================
-local Aimbot = {
-    Enabled = false,
-    Smoothness = 0.22,
-    FOV = 180,
-    TargetPart = "Head",
-    TeamCheck = false,
-    VisibilityCheck = true,
-    HoldToAim = true,
-}
+local AimEnabled = false
+local Smoothness = 0.25
+local FOV = 160
+local TargetPart = "Head"
+local HoldToAim = true
 
-local Combat = {
-    RapidFire = false,
-    NoReload = false,
-    NoRecoil = false,
-    Triggerbot = false,
-    InfiniteAmmo = false,
-}
+print("✅ Light Aimbot Loaded")
+print("Hold Right Click to Aim | Press INSERT to toggle Aimbot")
 
-local Visuals = {
-    ShowFOV = true,
-    ESP_Enabled = false,
-}
-
--- ==================== KAVO UI LIBRARY ====================
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Universal Aimbot", "Ocean")
-
--- ==================== TABS ====================
-local AimbotTab = Window:NewTab("Aimbot")
-local CombatTab = Window:NewTab("Combat")
-local VisualsTab = Window:NewTab("Visuals")
-local SettingsTab = Window:NewTab("Settings")
-
--- ==================== AIMBOT TAB ====================
-AimbotTab:NewToggle("Enable Aimbot", false, function(state)
-    Aimbot.Enabled = state
-end)
-
-AimbotTab:NewToggle("Hold to Aim (Right Click)", true, function(state)
-    Aimbot.HoldToAim = state
-end)
-
-AimbotTab:NewSlider("Smoothness", 0.05, 1, 0.22, function(value)
-    Aimbot.Smoothness = value
-end)
-
-AimbotTab:NewSlider("FOV", 50, 600, 180, function(value)
-    Aimbot.FOV = value
-end)
-
-AimbotTab:NewDropdown("Target Part", {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"}, function(currentOption)
-    Aimbot.TargetPart = currentOption
-end)
-
-AimbotTab:NewToggle("Team Check", false, function(state)
-    Aimbot.TeamCheck = state
-end)
-
-AimbotTab:NewToggle("Visibility Check", true, function(state)
-    Aimbot.VisibilityCheck = state
-end)
-
--- ==================== COMBAT TAB ====================
-CombatTab:NewToggle("Rapid Fire", false, function(state)
-    Combat.RapidFire = state
-end)
-
-CombatTab:NewToggle("No Reload / Infinite Ammo", false, function(state)
-    Combat.NoReload = state
-end)
-
-CombatTab:NewToggle("No Recoil", false, function(state)
-    Combat.NoRecoil = state
-end)
-
-CombatTab:NewToggle("Triggerbot", false, function(state)
-    Combat.Triggerbot = state
-end)
-
--- ==================== VISUALS TAB ====================
-VisualsTab:NewToggle("Show FOV Circle", true, function(state)
-    Visuals.ShowFOV = state
-end)
-
-VisualsTab:NewToggle("Basic ESP (Boxes)", false, function(state)
-    Visuals.ESP_Enabled = state
-end)
-
--- ==================== FOV CIRCLE ====================
+-- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 2
-fovCircle.NumSides = 80
-fovCircle.Radius = Aimbot.FOV
+fovCircle.Radius = FOV
 fovCircle.Filled = false
-fovCircle.Transparency = 0.75
+fovCircle.Transparency = 0.6
 fovCircle.Color = Color3.fromRGB(255, 0, 100)
 fovCircle.Visible = true
 
--- ==================== MAIN FUNCTIONS ====================
+-- ==================== FUNCTIONS ====================
 local function isVisible(targetChar)
-    if not Aimbot.VisibilityCheck then return true end
-    local target = targetChar:FindFirstChild(Aimbot.TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
+    local target = targetChar:FindFirstChild(TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
     if not target then return false end
 
     local origin = Camera.CFrame.Position
-    local direction = (target.Position - origin).Unit * 3000
+    local direction = (target.Position - origin).Unit * 2000
 
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character}
@@ -127,24 +45,22 @@ local function isVisible(targetChar)
 end
 
 local function getClosestPlayer()
-    local closest, minDist = nil, Aimbot.FOV + 1
+    local closest, minDist = nil, FOV
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hum = player.Character:FindFirstChild("Humanoid")
-            local part = player.Character:FindFirstChild(Aimbot.TargetPart) or player.Character:FindFirstChild("HumanoidRootPart")
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            local part = plr.Character:FindFirstChild(TargetPart) or plr.Character:FindFirstChild("HumanoidRootPart")
 
             if hum and hum.Health > 0 and part then
-                if Aimbot.TeamCheck and player.Team == LocalPlayer.Team then continue end
-
                 local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
                     local mousePos = UserInputService:GetMouseLocation()
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
 
-                    if dist < minDist and isVisible(player.Character) then
+                    if dist < minDist and isVisible(plr.Character) then
                         minDist = dist
-                        closest = player
+                        closest = plr
                     end
                 end
             end
@@ -153,23 +69,22 @@ local function getClosestPlayer()
     return closest
 end
 
--- ==================== AIMBOT LOOP ====================
+-- ==================== MAIN LOOP ====================
 RunService.RenderStepped:Connect(function()
     fovCircle.Position = UserInputService:GetMouseLocation()
-    fovCircle.Radius = Aimbot.FOV
-    fovCircle.Visible = Visuals.ShowFOV
+    fovCircle.Radius = FOV
 
-    if not Aimbot.Enabled then return end
+    if not AimEnabled then return end
 
     local target = getClosestPlayer()
     if target and target.Character then
-        local part = target.Character:FindFirstChild(Aimbot.TargetPart) or target.Character:FindFirstChild("HumanoidRootPart")
+        local part = target.Character:FindFirstChild(TargetPart) or target.Character:FindFirstChild("HumanoidRootPart")
         if part then
             local targetPos = Camera:WorldToViewportPoint(part.Position)
             local mousePos = UserInputService:GetMouseLocation()
 
-            local dx = (targetPos.X - mousePos.X) * Aimbot.Smoothness
-            local dy = (targetPos.Y - mousePos.Y) * Aimbot.Smoothness
+            local dx = (targetPos.X - mousePos.X) * Smoothness
+            local dy = (targetPos.Y - mousePos.Y) * Smoothness
 
             mousemoverel(dx, dy)
         end
@@ -179,27 +94,22 @@ end)
 -- ==================== KEYBINDS ====================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
-        Aimbot.Enabled = true
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right Click
+        if HoldToAim then
+            AimEnabled = true
+        end
+    elseif input.KeyCode == Enum.KeyCode.Insert then
+        AimEnabled = not AimEnabled
+        print("Aimbot:", AimEnabled and "ON" or "OFF")
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
-        Aimbot.Enabled = false
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and HoldToAim then
+        AimEnabled = false
     end
 end)
 
--- ==================== COMBAT FEATURES ====================
-RunService.Heartbeat:Connect(function()
-    if not LocalPlayer.Character then return end
-    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if not tool then return end
-
-    if Combat.RapidFire then
-        tool:Activate()
-    end
-end)
-
-print("✅ Universal Aimbot Loaded Successfully!")
+print("Script injected. Try in a new server if it still crashes.")
 print("Press P to open the menu")
