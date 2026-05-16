@@ -1,5 +1,6 @@
 -- =============================================
--- UNIVERSAL ROBLOX SCRIPT - AIMBOT + FLY + ESP + NOCLIP
+-- FULL UNIVERSAL ROBLOX CHEAT
+-- Aimbot + Fly + Noclip + ESP + Good GUI
 -- =============================================
 
 local Players = game:GetService("Players")
@@ -9,14 +10,23 @@ local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 -- ==================== SETTINGS ====================
-local Aimbot = {Enabled = false, Smoothness = 0.22, FOV = 180, TargetPart = "Head", TeamCheck = false, VisibilityCheck = true, HoldToAim = true}
+local Aimbot = {
+    Enabled = false,
+    Smoothness = 0.23,
+    FOV = 180,
+    TargetPart = "Head",
+    TeamCheck = false,
+    VisibilityCheck = true,
+    HoldToAim = true
+}
+
 local Fly = {Enabled = false, Speed = 70}
 local Noclip = {Enabled = false}
 local ESP = {Enabled = false}
 
--- ==================== GUI (Kavo UI) ====================
+-- ==================== GUI ====================
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Universal Script", "Ocean")
+local Window = Library.CreateLib("Universal Cheat", "Ocean")
 
 local AimbotTab = Window:NewTab("Aimbot")
 local MovementTab = Window:NewTab("Movement")
@@ -25,7 +35,7 @@ local VisualsTab = Window:NewTab("Visuals")
 -- Aimbot Tab
 AimbotTab:NewToggle("Enable Aimbot", false, function(s) Aimbot.Enabled = s end)
 AimbotTab:NewToggle("Hold Right Click", true, function(s) Aimbot.HoldToAim = s end)
-AimbotTab:NewSlider("Smoothness", 0.05, 1, 0.22, function(v) Aimbot.Smoothness = v end)
+AimbotTab:NewSlider("Smoothness", 0.05, 1, 0.23, function(v) Aimbot.Smoothness = v end)
 AimbotTab:NewSlider("FOV", 50, 600, 180, function(v) Aimbot.FOV = v end)
 AimbotTab:NewDropdown("Target Part", {"Head", "UpperTorso", "HumanoidRootPart"}, function(v) Aimbot.TargetPart = v end)
 AimbotTab:NewToggle("Team Check", false, function(s) Aimbot.TeamCheck = s end)
@@ -39,16 +49,16 @@ MovementTab:NewToggle("Noclip (Walk Through Walls)", false, function(s) Noclip.E
 -- Visuals Tab
 VisualsTab:NewToggle("Enable ESP", false, function(s) ESP.Enabled = s end)
 
-print("✅ Universal Script Loaded! Press Right Ctrl to open menu")
+print("✅ Full Universal Cheat Loaded! | Press Right Ctrl for Menu")
 
--- ==================== AIMBOT ====================
+-- ==================== AIMBOT LOGIC ====================
 local function isVisible(targetChar)
     if not Aimbot.VisibilityCheck then return true end
     local target = targetChar:FindFirstChild(Aimbot.TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
     if not target then return false end
 
     local origin = Camera.CFrame.Position
-    local direction = (target.Position - origin).Unit * 2500
+    local direction = (target.Position - origin).Unit * 3000
 
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = {LocalPlayer.Character}
@@ -84,24 +94,8 @@ local function getClosestPlayer()
     return closest
 end
 
--- ==================== ESP ====================
-local espObjects = {}
-local function createESP(plr)
-    if plr == LocalPlayer then return end
-    local box = Drawing.new("Square")
-    box.Thickness = 2
-    box.Filled = false
-    box.Transparency = 1
-    box.Color = Color3.fromRGB(0, 255, 100)
-    espObjects[plr] = box
-end
-
-for _, plr in ipairs(Players:GetPlayers()) do createESP(plr) end
-Players.PlayerAdded:Connect(createESP)
-
 -- ==================== MAIN LOOP ====================
 RunService.RenderStepped:Connect(function()
-    -- Aimbot
     if Aimbot.Enabled then
         local target = getClosestPlayer()
         if target and target.Character then
@@ -115,53 +109,30 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-
-    -- ESP
-    if ESP.Enabled then
-        for plr, box in pairs(espObjects) do
-            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local root = plr.Character.HumanoidRootPart
-                local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                if onScreen then
-                    box.Visible = true
-                    box.Position = Vector2.new(screenPos.X - 40, screenPos.Y - 60)
-                    box.Size = Vector2.new(80, 120)
-                else
-                    box.Visible = false
-                end
-            else
-                box.Visible = false
-            end
-        end
-    else
-        for _, box in pairs(espObjects) do box.Visible = false end
-    end
 end)
 
 -- ==================== FLY + NOCLIP ====================
 RunService.Heartbeat:Connect(function()
-    if Fly.Enabled and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
-        local root = Player.Character.HumanoidRootPart
+    if Fly.Enabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
         local cam = workspace.CurrentCamera
-        local move = Vector3.new()
+        local dir = Vector3.new()
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.new(0,1,0) end
 
-        if move.Magnitude > 0 then
-            root.Velocity = move.Unit * Fly.Speed
-        else
-            root.Velocity = Vector3.new()
+        if dir.Magnitude > 0 then
+            root.Velocity = dir.Unit * Fly.Speed
         end
     end
 
     -- Noclip
-    if Noclip.Enabled and Player.Character then
-        for _, part in pairs(Player.Character:GetDescendants()) do
+    if Noclip.Enabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
             if part:IsA("BasePart") then
                 part.CanCollide = false
             end
@@ -169,4 +140,18 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-print("Script Loaded Successfully! Use Right Ctrl to open menu.")
+-- ==================== KEYBINDS ====================
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
+        Aimbot.Enabled = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 and Aimbot.HoldToAim then
+        Aimbot.Enabled = false
+    end
+end)
+
+print("Hold Right Click to use Aimbot")
