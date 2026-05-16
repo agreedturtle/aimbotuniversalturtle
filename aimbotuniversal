@@ -1,142 +1,172 @@
+-- =============================================
+-- UNIVERSAL ROBLOX SCRIPT - AIMBOT + FLY + ESP + NOCLIP
+-- =============================================
+
 local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
 -- ==================== SETTINGS ====================
-local flySpeed = 70
-local flying = false
+local Aimbot = {Enabled = false, Smoothness = 0.22, FOV = 180, TargetPart = "Head", TeamCheck = false, VisibilityCheck = true, HoldToAim = true}
+local Fly = {Enabled = false, Speed = 70}
+local Noclip = {Enabled = false}
+local ESP = {Enabled = false}
 
-local hitboxEnabled = false
-local hitboxSize = 14
-local hitboxTransparency = 0.65
-
-local wallhackEnabled = false
-
--- ==================== FLY ====================
-local flyBV, flyBAV
-
-local function startFly()
-    if flying then return end
-    local char = Player.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    
-    flying = true
-    local hum = char:FindFirstChild("Humanoid")
-    if hum then hum.PlatformStand = true end
-    
-    flyBV = Instance.new("BodyVelocity")
-    flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-    flyBV.Parent = char.HumanoidRootPart
-    
-    flyBAV = Instance.new("BodyAngularVelocity")
-    flyBAV.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    flyBAV.Parent = char.HumanoidRootPart
-end
-
-local function endFly()
-    flying = false
-    if flyBV then flyBV:Destroy() end
-    if flyBAV then flyBAV:Destroy() end
-    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
-    if hum then hum.PlatformStand = false end
-end
-
--- ==================== HITBOX + WALLHACK ====================
-local function updateHitboxes()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= Player and plr.Character then
-            local root = plr.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                if hitboxEnabled then
-                    root.Size = Vector3.new(hitboxSize, hitboxSize * 2.2, hitboxSize)
-                    root.Transparency = hitboxTransparency
-                    root.CanCollide = false
-                    root.Massless = true
-                else
-                    root.Size = Vector3.new(2, 4, 1)
-                    root.Transparency = 0
-                    root.CanCollide = true
-                end
-            end
-
-            -- Wallhack
-            if wallhackEnabled then
-                for _, part in pairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.Transparency = 0.3
-                        part.Material = Enum.Material.ForceField
-                        part.Color = Color3.fromRGB(0, 255, 150)
-                    end
-                end
-            elseif not hitboxEnabled then
-                for _, part in pairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.Transparency = 0
-                        part.Material = Enum.Material.Plastic
-                    end
-                end
-            end
-        end
-    end
-end
-
--- ==================== GUI (Kavo UI - More Stable) ====================
+-- ==================== GUI (Kavo UI) ====================
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
-local Window = Library.CreateLib("Strucid ESP", "Ocean")
+local Window = Library.CreateLib("Universal Script", "Ocean")
 
-local MainTab = Window:NewTab("Main")
-local FlySection = MainTab:NewSection("Fly")
-local HitboxSection = MainTab:NewSection("Hitbox")
-local WallhackSection = MainTab:NewSection("Wallhack")
+local AimbotTab = Window:NewTab("Aimbot")
+local MovementTab = Window:NewTab("Movement")
+local VisualsTab = Window:NewTab("Visuals")
 
-FlySection:NewToggle("Enable Fly", false, function(state)
-    if state then
-        startFly()
+-- Aimbot Tab
+AimbotTab:NewToggle("Enable Aimbot", false, function(s) Aimbot.Enabled = s end)
+AimbotTab:NewToggle("Hold Right Click", true, function(s) Aimbot.HoldToAim = s end)
+AimbotTab:NewSlider("Smoothness", 0.05, 1, 0.22, function(v) Aimbot.Smoothness = v end)
+AimbotTab:NewSlider("FOV", 50, 600, 180, function(v) Aimbot.FOV = v end)
+AimbotTab:NewDropdown("Target Part", {"Head", "UpperTorso", "HumanoidRootPart"}, function(v) Aimbot.TargetPart = v end)
+AimbotTab:NewToggle("Team Check", false, function(s) Aimbot.TeamCheck = s end)
+AimbotTab:NewToggle("Visibility Check", true, function(s) Aimbot.VisibilityCheck = s end)
+
+-- Movement Tab
+MovementTab:NewToggle("Enable Fly", false, function(s) Fly.Enabled = s end)
+MovementTab:NewSlider("Fly Speed", 20, 200, 70, function(v) Fly.Speed = v end)
+MovementTab:NewToggle("Noclip (Walk Through Walls)", false, function(s) Noclip.Enabled = s end)
+
+-- Visuals Tab
+VisualsTab:NewToggle("Enable ESP", false, function(s) ESP.Enabled = s end)
+
+print("✅ Universal Script Loaded! Press Right Ctrl to open menu")
+
+-- ==================== AIMBOT ====================
+local function isVisible(targetChar)
+    if not Aimbot.VisibilityCheck then return true end
+    local target = targetChar:FindFirstChild(Aimbot.TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
+    if not target then return false end
+
+    local origin = Camera.CFrame.Position
+    local direction = (target.Position - origin).Unit * 2500
+
+    local params = RaycastParams.new()
+    params.FilterDescendantsInstances = {LocalPlayer.Character}
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local result = workspace:Raycast(origin, direction, params)
+    return result and result.Instance:IsDescendantOf(targetChar)
+end
+
+local function getClosestPlayer()
+    local closest, minDist = nil, Aimbot.FOV
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local hum = plr.Character:FindFirstChild("Humanoid")
+            local part = plr.Character:FindFirstChild(Aimbot.TargetPart) or plr.Character:FindFirstChild("HumanoidRootPart")
+            
+            if hum and hum.Health > 0 and part then
+                if Aimbot.TeamCheck and plr.Team == LocalPlayer.Team then continue end
+                
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < minDist and isVisible(plr.Character) then
+                        minDist = dist
+                        closest = plr
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ==================== ESP ====================
+local espObjects = {}
+local function createESP(plr)
+    if plr == LocalPlayer then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+    box.Color = Color3.fromRGB(0, 255, 100)
+    espObjects[plr] = box
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do createESP(plr) end
+Players.PlayerAdded:Connect(createESP)
+
+-- ==================== MAIN LOOP ====================
+RunService.RenderStepped:Connect(function()
+    -- Aimbot
+    if Aimbot.Enabled then
+        local target = getClosestPlayer()
+        if target and target.Character then
+            local part = target.Character:FindFirstChild(Aimbot.TargetPart) or target.Character:FindFirstChild("HumanoidRootPart")
+            if part then
+                local targetPos = Camera:WorldToViewportPoint(part.Position)
+                local mousePos = UserInputService:GetMouseLocation()
+                local dx = (targetPos.X - mousePos.X) * Aimbot.Smoothness
+                local dy = (targetPos.Y - mousePos.Y) * Aimbot.Smoothness
+                mousemoverel(dx, dy)
+            end
+        end
+    end
+
+    -- ESP
+    if ESP.Enabled then
+        for plr, box in pairs(espObjects) do
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local root = plr.Character.HumanoidRootPart
+                local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                if onScreen then
+                    box.Visible = true
+                    box.Position = Vector2.new(screenPos.X - 40, screenPos.Y - 60)
+                    box.Size = Vector2.new(80, 120)
+                else
+                    box.Visible = false
+                end
+            else
+                box.Visible = false
+            end
+        end
     else
-        endFly()
+        for _, box in pairs(espObjects) do box.Visible = false end
     end
 end)
 
-FlySection:NewSlider("Fly Speed", 20, 150, 70, function(value)
-    flySpeed = value
-end)
-
-HitboxSection:NewToggle("Enable Hitbox", false, function(state)
-    hitboxEnabled = state
-end)
-
-HitboxSection:NewSlider("Hitbox Size", 6, 25, 14, function(value)
-    hitboxSize = value
-end)
-
-HitboxSection:NewSlider("Hitbox Transparency", 0, 1, 0.65, function(value)
-    hitboxTransparency = value
-end)
-
-WallhackSection:NewToggle("Enable Wallhack (Chams)", false, function(state)
-    wallhackEnabled = state
-end)
-
--- ==================== LOOPS ====================
+-- ==================== FLY + NOCLIP ====================
 RunService.Heartbeat:Connect(function()
-    if flying and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+    if Fly.Enabled and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+        local root = Player.Character.HumanoidRootPart
         local cam = workspace.CurrentCamera
-        local moveDir = Vector3.new()
+        local move = Vector3.new()
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
 
-        if moveDir.Magnitude > 0 then
-            flyBV.Velocity = moveDir.Unit * flySpeed
+        if move.Magnitude > 0 then
+            root.Velocity = move.Unit * Fly.Speed
         else
-            flyBV.Velocity = Vector3.new()
+            root.Velocity = Vector3.new()
+        end
+    end
+
+    -- Noclip
+    if Noclip.Enabled and Player.Character then
+        for _, part in pairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
         end
     end
 end)
 
-RunService.Stepped:Connect(updateHitboxes)
-
-print("✅ Strucid ESP Fixed & Loaded! | Press Right Ctrl to open menu")
+print("Script Loaded Successfully! Use Right Ctrl to open menu.")
