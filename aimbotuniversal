@@ -1,115 +1,142 @@
--- =============================================
--- LIGHT UNIVERSAL AIMBOT (More Stable)
--- =============================================
-
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local Player = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-
-local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
 
 -- ==================== SETTINGS ====================
-local AimEnabled = false
-local Smoothness = 0.25
-local FOV = 160
-local TargetPart = "Head"
-local HoldToAim = true
+local flySpeed = 70
+local flying = false
 
-print("✅ Light Aimbot Loaded")
-print("Hold Right Click to Aim | Press INSERT to toggle Aimbot")
+local hitboxEnabled = false
+local hitboxSize = 14
+local hitboxTransparency = 0.65
 
--- FOV Circle
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 2
-fovCircle.Radius = FOV
-fovCircle.Filled = false
-fovCircle.Transparency = 0.6
-fovCircle.Color = Color3.fromRGB(255, 0, 100)
-fovCircle.Visible = true
+local wallhackEnabled = false
 
--- ==================== FUNCTIONS ====================
-local function isVisible(targetChar)
-    local target = targetChar:FindFirstChild(TargetPart) or targetChar:FindFirstChild("HumanoidRootPart")
-    if not target then return false end
+-- ==================== FLY ====================
+local flyBV, flyBAV
 
-    local origin = Camera.CFrame.Position
-    local direction = (target.Position - origin).Unit * 2000
-
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {LocalPlayer.Character}
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-
-    local result = workspace:Raycast(origin, direction, params)
-    return result and result.Instance:IsDescendantOf(targetChar)
+local function startFly()
+    if flying then return end
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    flying = true
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then hum.PlatformStand = true end
+    
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flyBV.Parent = char.HumanoidRootPart
+    
+    flyBAV = Instance.new("BodyAngularVelocity")
+    flyBAV.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    flyBAV.Parent = char.HumanoidRootPart
 end
 
-local function getClosestPlayer()
-    local closest, minDist = nil, FOV
+local function endFly()
+    flying = false
+    if flyBV then flyBV:Destroy() end
+    if flyBAV then flyBAV:Destroy() end
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then hum.PlatformStand = false end
+end
 
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character then
-            local hum = plr.Character:FindFirstChild("Humanoid")
-            local part = plr.Character:FindFirstChild(TargetPart) or plr.Character:FindFirstChild("HumanoidRootPart")
+-- ==================== HITBOX + WALLHACK ====================
+local function updateHitboxes()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= Player and plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                if hitboxEnabled then
+                    root.Size = Vector3.new(hitboxSize, hitboxSize * 2.2, hitboxSize)
+                    root.Transparency = hitboxTransparency
+                    root.CanCollide = false
+                    root.Massless = true
+                else
+                    root.Size = Vector3.new(2, 4, 1)
+                    root.Transparency = 0
+                    root.CanCollide = true
+                end
+            end
 
-            if hum and hum.Health > 0 and part then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local mousePos = UserInputService:GetMouseLocation()
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-
-                    if dist < minDist and isVisible(plr.Character) then
-                        minDist = dist
-                        closest = plr
+            -- Wallhack
+            if wallhackEnabled then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 0.3
+                        part.Material = Enum.Material.ForceField
+                        part.Color = Color3.fromRGB(0, 255, 150)
+                    end
+                end
+            elseif not hitboxEnabled then
+                for _, part in pairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.Transparency = 0
+                        part.Material = Enum.Material.Plastic
                     end
                 end
             end
         end
     end
-    return closest
 end
 
--- ==================== MAIN LOOP ====================
-RunService.RenderStepped:Connect(function()
-    fovCircle.Position = UserInputService:GetMouseLocation()
-    fovCircle.Radius = FOV
+-- ==================== GUI (Kavo UI - More Stable) ====================
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window = Library.CreateLib("Strucid ESP", "Ocean")
 
-    if not AimEnabled then return end
+local MainTab = Window:NewTab("Main")
+local FlySection = MainTab:NewSection("Fly")
+local HitboxSection = MainTab:NewSection("Hitbox")
+local WallhackSection = MainTab:NewSection("Wallhack")
 
-    local target = getClosestPlayer()
-    if target and target.Character then
-        local part = target.Character:FindFirstChild(TargetPart) or target.Character:FindFirstChild("HumanoidRootPart")
-        if part then
-            local targetPos = Camera:WorldToViewportPoint(part.Position)
-            local mousePos = UserInputService:GetMouseLocation()
+FlySection:NewToggle("Enable Fly", false, function(state)
+    if state then
+        startFly()
+    else
+        endFly()
+    end
+end)
 
-            local dx = (targetPos.X - mousePos.X) * Smoothness
-            local dy = (targetPos.Y - mousePos.Y) * Smoothness
+FlySection:NewSlider("Fly Speed", 20, 150, 70, function(value)
+    flySpeed = value
+end)
 
-            mousemoverel(dx, dy)
+HitboxSection:NewToggle("Enable Hitbox", false, function(state)
+    hitboxEnabled = state
+end)
+
+HitboxSection:NewSlider("Hitbox Size", 6, 25, 14, function(value)
+    hitboxSize = value
+end)
+
+HitboxSection:NewSlider("Hitbox Transparency", 0, 1, 0.65, function(value)
+    hitboxTransparency = value
+end)
+
+WallhackSection:NewToggle("Enable Wallhack (Chams)", false, function(state)
+    wallhackEnabled = state
+end)
+
+-- ==================== LOOPS ====================
+RunService.Heartbeat:Connect(function()
+    if flying and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+        local cam = workspace.CurrentCamera
+        local moveDir = Vector3.new()
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
+
+        if moveDir.Magnitude > 0 then
+            flyBV.Velocity = moveDir.Unit * flySpeed
+        else
+            flyBV.Velocity = Vector3.new()
         end
     end
 end)
 
--- ==================== KEYBINDS ====================
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right Click
-        if HoldToAim then
-            AimEnabled = true
-        end
-    elseif input.KeyCode == Enum.KeyCode.Insert then
-        AimEnabled = not AimEnabled
-        print("Aimbot:", AimEnabled and "ON" or "OFF")
-    end
-end)
+RunService.Stepped:Connect(updateHitboxes)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 and HoldToAim then
-        AimEnabled = false
-    end
-end)
-
-print("Script injected. Try in a new server if it still crashes.")
-print("Press P to open the menu")
+print("✅ Strucid ESP Fixed & Loaded! | Press Right Ctrl to open menu")
